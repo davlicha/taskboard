@@ -1,0 +1,21 @@
+{{- if not .Values.api.rollout.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "taskboard.componentName" (dict "root" . "component" "api") }}
+  labels:
+    {{- include "taskboard.labels" (dict "root" . "component" "api") | nindent 4 }}
+spec:
+  replicas: {{ .Values.api.replicaCount }}
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      {{- include "taskboard.selectorLabels" (dict "root" . "component" "api") | nindent 6 }}
+  template:
+    {{- include "taskboard.api.podTemplate" . | nindent 4 }}
+{{- end }}

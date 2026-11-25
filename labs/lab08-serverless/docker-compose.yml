@@ -1,0 +1,12 @@
+# LocalStack для ЛР-8. Остання версія без обов'язкового LOCALSTACK_AUTH_TOKEN — 4.14.0.
+services:
+  localstack:
+    image: localstack/localstack:4.14.0
+    ports:
+      - "4566:4566"
+    environment:
+      SERVICES: lambda,dynamodb,apigateway,iam,logs,cloudwatch,sts
+      LAMBDA_RUNTIME_ENVIRONMENT_TIMEOUT: "60"
+      LOCALSTACK_AUTH_TOKEN: ${LOCALSTACK_AUTH_TOKEN:-}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock # Lambda запускається в окремому контейнері

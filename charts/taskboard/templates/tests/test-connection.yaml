@@ -1,0 +1,23 @@
+{{- /* helm test <release>: перевіряє /health API і веб-сторінку */}}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "taskboard.fullname" . }}-test
+  labels:
+    {{- include "taskboard.labels" (dict "root" . "component" "test") | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  containers:
+    - name: curl
+      image: curlimages/curl:8.11.1
+      command:
+        - sh
+        - -c
+        - |
+          set -e
+          curl -fsS --retry 5 --retry-all-errors --retry-delay 2 http://{{ include "taskboard.componentName" (dict "root" . "component" "api") }}:{{ .Values.api.service.port }}/health
+          echo
+          curl -fsS --retry 5 --retry-all-errors --retry-delay 2 -o /dev/null -w "web: %{http_code}\n" http://{{ include "taskboard.componentName" (dict "root" . "component" "web") }}:{{ .Values.web.service.port }}/

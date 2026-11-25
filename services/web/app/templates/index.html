@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <title>{{ title }}</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; color: #1f2933; }
+    h1 { margin-bottom: 4px; }
+    .meta { color: #7b8794; font-size: 13px; margin-bottom: 24px; }
+    form.add { display: flex; gap: 8px; margin-bottom: 16px; }
+    input[type=text] { flex: 1; padding: 8px; }
+    ul { list-style: none; padding: 0; }
+    li { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid #e4e7eb; }
+    li .t { flex: 1; }
+    li.done .t { text-decoration: line-through; color: #9aa5b1; }
+    .error { background: #fde8e8; color: #9b1c1c; padding: 8px; }
+    button { cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>{{ title }}</h1>
+  <div class="meta">
+    web {{ web_version }} · api {{ api_info.get('version', '?') }} ({{ api_info.get('instance', '?') }}) · pod {{ host }}
+  </div>
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  <form class="add" method="post" action="/tasks">
+    <input type="text" name="title" placeholder="Нова задача" maxlength="200" required>
+    <button type="submit">Додати</button>
+  </form>
+  <ul>
+    {% for t in tasks %}
+    <li class="{{ 'done' if t.done }}">
+      <form method="post" action="/tasks/{{ t.id }}/toggle"><button>{{ '✓' if t.done else '○' }}</button></form>
+      <span class="t">{{ t.title }}</span>
+      <form method="post" action="/tasks/{{ t.id }}/delete"><button>✕</button></form>
+    </li>
+    {% else %}
+    <li>Задач поки немає</li>
+    {% endfor %}
+  </ul>
+</body>
+</html>

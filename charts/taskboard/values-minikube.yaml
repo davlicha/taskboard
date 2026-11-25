@@ -1,0 +1,60 @@
+# Значення для minikube під керуванням Argo CD (ЛР-5, 6, 7).
+# Реліз нової версії = зміна api.image.tag у цьому файлі + commit + push.
+api:
+  image:
+    tag: "1.0.0"
+  config:
+    APP_ENV: minikube
+    LOG_LEVEL: INFO
+  # ЛР-7: "погана" версія — поставити, наприклад, "0.3" (30% запитів -> 500)
+  failRate: "0"
+  # ЛР-6: canary через Argo Rollouts
+  rollout:
+    enabled: true
+    replicas: 4
+    canary:
+      maxSurge: "25%"
+      maxUnavailable: 0
+      steps:
+        - setWeight: 25
+        - analysis: {} # ЛР-7: перевірка частки успішних запитів (>= 95%)
+        - pause: {} # ручна пауза -> promote
+        - setWeight: 50
+        - pause: { duration: 30s }
+        - setWeight: 75
+        - pause: { duration: 30s }
+
+web:
+  image:
+    tag: "1.0.0"
+  replicaCount: 1
+  service:
+    type: NodePort
+    nodePort: 30080
+  config:
+    APP_TITLE: Taskboard (GitOps)
+
+postgres:
+  auth:
+    # Секрет створюється вручну один раз (bootstrap/create-secrets.sh), паролів у Git немає
+    existingSecret: taskboard-db
+
+ingress:
+  enabled: true
+  host: taskboard.local
+
+# Helm-хуки Argo CD трактує як PreSync — на першій синхронізації БД ще немає
+hooks:
+  preUpgrade:
+    enabled: false
+
+metrics:
+  serviceMonitor:
+    enabled: true
+  prometheusRule:
+    enabled: true
+  dashboard:
+    enabled: true
+
+analysis:
+  enabled: true

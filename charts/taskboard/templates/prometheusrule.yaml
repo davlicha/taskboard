@@ -1,0 +1,27 @@
+{{- if .Values.metrics.prometheusRule.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "taskboard.fullname" . }}
+  labels:
+    {{- include "taskboard.labels" (dict "root" . "component" "api") | nindent 4 }}
+    {{- with .Values.metrics.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    - name: taskboard.rules
+      rules:
+        - alert: TaskboardHighErrorRate
+          expr: |
+            sum(rate(http_requests_total{namespace="{{ .Release.Namespace }}", route=~"/api/.*", status=~"5.."}[1m]))
+            /
+            sum(rate(http_requests_total{namespace="{{ .Release.Namespace }}", route=~"/api/.*"}[1m]))
+            > {{ .Values.metrics.prometheusRule.errorRateThreshold }}
+          for: {{ .Values.metrics.prometheusRule.for }}
+          labels:
+            severity: warning
+          annotations:
+            summary: "Частка 5xx у taskboard-api перевищує {{ mul .Values.metrics.prometheusRule.errorRateThreshold 100 }}%"
+            description: "Поточне значення: {{ "{{" }} $value | humanizePercentage {{ "}}" }}"
+{{- end }}

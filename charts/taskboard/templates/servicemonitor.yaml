@@ -1,0 +1,25 @@
+{{- if .Values.metrics.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "taskboard.componentName" (dict "root" . "component" "api") }}
+  labels:
+    {{- include "taskboard.labels" (dict "root" . "component" "api") | nindent 4 }}
+    {{- with .Values.metrics.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "taskboard.selectorLabels" (dict "root" . "component" "api") | nindent 6 }}
+  namespaceSelector:
+    matchNames: [{{ .Release.Namespace }}]
+  # мітка хешу шаблону пода -> можна відрізнити stable і canary в PromQL
+  podTargetLabels:
+    - rollouts-pod-template-hash
+    - app.kubernetes.io/version
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: {{ .Values.metrics.serviceMonitor.interval }}
+{{- end }}

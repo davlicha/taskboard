@@ -1,0 +1,108 @@
+# Значення за замовчуванням = середовище розробки (dev).
+nameOverride: ""
+fullnameOverride: ""
+imagePullSecrets: []
+
+api:
+  image:
+    repository: ghcr.io/davlicha/taskboard-api
+    tag: "" # порожньо -> .Chart.AppVersion
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    port: 8000
+  resources:
+    requests: { cpu: 50m, memory: 96Mi }
+    limits: { cpu: 500m, memory: 256Mi }
+  # Параметри конфігурації застосунку -> ConfigMap -> змінні оточення
+  config:
+    APP_ENV: dev
+    LOG_LEVEL: DEBUG
+    APP_NAME: taskboard-api
+  failRate: "0" # ЛР-7: частка запитів /api/*, що отримують 500
+  slowMs: "0" # ЛР-7: штучна затримка запитів /api/*
+  # ЛР-6: Argo Rollouts (canary) замість Deployment
+  rollout:
+    enabled: false
+    replicas: 4
+    canary:
+      maxSurge: "25%"
+      maxUnavailable: 0
+      steps:
+        - setWeight: 25
+        - pause: {} # ручна пауза -> kubectl argo rollouts promote
+        - setWeight: 50
+        - pause: { duration: 30s }
+        - setWeight: 75
+        - pause: { duration: 30s }
+
+web:
+  image:
+    repository: ghcr.io/davlicha/taskboard-web
+    tag: ""
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  service:
+    type: NodePort
+    port: 80
+    nodePort: null
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { cpu: 300m, memory: 192Mi }
+  config:
+    APP_TITLE: Taskboard (dev)
+    API_TIMEOUT: "3"
+
+postgres:
+  enabled: true
+  image: postgres:16-alpine
+  auth:
+    username: taskboard
+    database: taskboard
+    # Пароль НЕ зберігається у файлах значень. Варіанти:
+    #   --set postgres.auth.password=...   або   existingSecret: <ім'я секрету>
+    #   якщо нічого не задано — генерується випадковий і зберігається між оновленнями
+    password: ""
+    existingSecret: ""
+  persistence:
+    enabled: true
+    size: 1Gi
+    storageClass: ""
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits: { cpu: 500m, memory: 512Mi }
+
+ingress:
+  enabled: false
+  className: nginx
+  host: taskboard.local
+  annotations: {}
+
+hooks:
+  preUpgrade:
+    enabled: true
+
+# ЛР-7: метрики й дашборд (потрібен kube-prometheus-stack)
+metrics:
+  serviceMonitor:
+    enabled: false
+    interval: 15s
+    labels:
+      release: kube-prometheus-stack
+  prometheusRule:
+    enabled: false
+    errorRateThreshold: 0.05
+    for: 1m
+  dashboard:
+    enabled: false
+
+# ЛР-7: AnalysisTemplate для Argo Rollouts (крок {analysis: {}} у canary.steps)
+analysis:
+  enabled: false
+  prometheusAddress: http://kube-prometheus-stack-prometheus.monitoring.svc:9090
+  successRate: 0.95
+  initialDelay: 30s
+  interval: 30s
+  count: 4
+  failureLimit: 1

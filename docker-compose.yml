@@ -1,0 +1,53 @@
+# Лабораторна №1: піднімає весь проєкт — PostgreSQL, API та веб-інтерфейс.
+#   cp .env.example .env && docker compose up --build
+#   UI: http://localhost:8080   API: http://localhost:8000/docs
+name: taskboard
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-taskboard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_DB: ${POSTGRES_DB:-taskboard}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: ./services/api
+      args:
+        APP_VERSION: ${APP_VERSION:-1.0.0}
+    image: taskboard-api:${APP_VERSION:-1.0.0}
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-taskboard}:${POSTGRES_PASSWORD:-change-me}@db:5432/${POSTGRES_DB:-taskboard}
+      APP_ENV: compose
+      LOG_LEVEL: INFO
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./services/web
+      args:
+        APP_VERSION: ${APP_VERSION:-1.0.0}
+    image: taskboard-web:${APP_VERSION:-1.0.0}
+    environment:
+      API_URL: http://api:8000
+      APP_TITLE: Taskboard
+    ports:
+      - "8080:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  pgdata:

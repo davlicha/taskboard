@@ -1,0 +1,179 @@
++ NS='-n taskboard'
++ kubectl -n taskboard get deploy,rs,pods,svc,pvc,ingress
+NAME                       READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/api        2/2     2            2           39s
+deployment.apps/postgres   1/1     1            1           39s
+deployment.apps/web        2/2     2            2           39s
+
+NAME                                  DESIRED   CURRENT   READY   AGE
+replicaset.apps/api-758cd668cf        2         2         2       39s
+replicaset.apps/postgres-67b669f994   1         1         1       39s
+replicaset.apps/web-8bd88ffd6         2         2         2       39s
+
+NAME                            READY   STATUS    RESTARTS   AGE
+pod/api-758cd668cf-664x7        1/1     Running   0          39s
+pod/api-758cd668cf-s2g8j        1/1     Running   0          39s
+pod/postgres-67b669f994-lgwcn   1/1     Running   0          39s
+pod/web-8bd88ffd6-48qkt         1/1     Running   0          39s
+pod/web-8bd88ffd6-rnjdc         1/1     Running   0          39s
+
+NAME               TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
+service/api        ClusterIP   10.111.73.107   <none>        8000/TCP       39s
+service/postgres   ClusterIP   10.108.33.37    <none>        5432/TCP       39s
+service/web        NodePort    10.96.34.204    <none>        80:30080/TCP   39s
+
+NAME                                  STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
+persistentvolumeclaim/postgres-data   Bound    pvc-ac160956-73ff-476c-a060-bb46ae8533e7   1Gi        RWO            standard       <unset>                 39s
+
+NAME                                  CLASS   HOSTS             ADDRESS   PORTS   AGE
+ingress.networking.k8s.io/taskboard   nginx   taskboard.local             80      14s
++ kubectl -n taskboard exec deploy/api -- printenv APP_ENV LOG_LEVEL APP_NAME
+minikube
+INFO
+taskboard-api
++ kubectl -n taskboard exec deploy/api -- sh -c 'echo "DATABASE_URL=${DATABASE_URL%%:*}://***"'
+DATABASE_URL=postgresql+psycopg://***
+++ kubectl -n taskboard get pod -l app.kubernetes.io/name=api -o 'jsonpath={.items[0].metadata.name}'
++ POD=api-758cd668cf-664x7
++ kubectl -n taskboard delete pod api-758cd668cf-664x7 --wait=false
+pod "api-758cd668cf-664x7" deleted from taskboard namespace
++ sleep 8
++ kubectl -n taskboard get pods -l app.kubernetes.io/name=api
+NAME                   READY   STATUS    RESTARTS   AGE
+api-758cd668cf-f2wnr   1/1     Running   0          8s
+api-758cd668cf-s2g8j   1/1     Running   0          48s
++ kubectl -n taskboard scale deploy/api --replicas=4
+deployment.apps/api scaled
++ kubectl -n taskboard rollout status deploy/api --timeout=120s
+Waiting for deployment "api" rollout to finish: 2 of 4 updated replicas are available...
+Waiting for deployment "api" rollout to finish: 3 of 4 updated replicas are available...
+deployment "api" successfully rolled out
++ kubectl -n taskboard run curl --rm -i --restart=Never --image=curlimages/curl:8.11.1 --quiet -- sh -c 'for i in $(seq 1 20); do curl -s http://api:8000/version; echo; done'
++ sort
++ uniq -c
+   5 {"version":"1.0.0","instance":"api-758cd668cf-f2wnr"}
+   4 {"version":"1.0.0","instance":"api-758cd668cf-qmbng"}
+   4 {"version":"1.0.0","instance":"api-758cd668cf-s2g8j"}
+   3 {"version":"1.0.0","instance":"api-758cd668cf-tj9q7"}
++ NS='-n taskboard'
++ kubectl -n taskboard run probe --restart=Never --image=curlimages/curl:8.11.1 -- sh -c 'ok=0; fail=0; for i in $(seq 1 120); do if curl -sf -m 2 http://api:8000/version >/dev/null; then ok=$((ok+1)); else fail=$((fail+1)); fi; sleep 0.25; done; echo "availability during update: ok=$ok fail=$fail"'
+pod/probe created
++ kubectl -n taskboard set image deploy/api api=ghcr.io/davlicha/taskboard-api:1.1.0
+deployment.apps/api image updated
++ kubectl -n taskboard annotate deploy/api 'kubernetes.io/change-cause=api 1.1.0' --overwrite
+deployment.apps/api annotated
++ kubectl -n taskboard rollout status deploy/api --timeout=180s
+Waiting for deployment "api" rollout to finish: 1 out of 4 new replicas have been updated...
+Waiting for deployment "api" rollout to finish: 1 out of 4 new replicas have been updated...
+Waiting for deployment "api" rollout to finish: 1 out of 4 new replicas have been updated...
+Waiting for deployment "api" rollout to finish: 2 out of 4 new replicas have been updated...
+Waiting for deployment "api" rollout to finish: 2 out of 4 new replicas have been updated...
+Waiting for deployment "api" rollout to finish: 2 out of 4 new replicas have been updated...
+Waiting for deployment "api" rollout to finish: 2 out of 4 new replicas have been updated...
+Waiting for deployment "api" rollout to finish: 3 out of 4 new replicas have been updated...
+Waiting for deployment "api" rollout to finish: 3 out of 4 new replicas have been updated...
+Waiting for deployment "api" rollout to finish: 3 out of 4 new replicas have been updated...
+Waiting for deployment "api" rollout to finish: 3 out of 4 new replicas have been updated...
+Waiting for deployment "api" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "api" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "api" rollout to finish: 1 old replicas are pending termination...
+deployment "api" successfully rolled out
++ kubectl -n taskboard exec deploy/api -- python -c 'import urllib.request;print(urllib.request.urlopen('\''http://localhost:8000/version'\'').read().decode())'
+{"version":"1.1.0","instance":"api-6466dc59cd-x6lsq"}
++ kubectl -n taskboard wait '--for=jsonpath={.status.phase}=Succeeded' pod/probe --timeout=60s
+pod/probe condition met
++ kubectl -n taskboard logs probe
+availability during update: ok=119 fail=1
++ kubectl -n taskboard delete pod probe --wait=false
+pod "probe" deleted from taskboard namespace
++ kubectl -n taskboard rollout history deploy/api
+deployment.apps/api 
+REVISION  CHANGE-CAUSE
+1         api 1.0.0
+2         api 1.1.0
+
++ kubectl -n taskboard rollout undo deploy/api
+Warning: resource deployments/api was previously managed with 'kubectl apply'. Rolling back will not update the kubectl.kubernetes.io/last-applied-configuration annotation, which may cause unexpected behavior on future 'kubectl apply' operations. Consider using 'kubectl apply' with your previous configuration file instead.
+deployment.apps/api rolled back
++ kubectl -n taskboard rollout status deploy/api --timeout=180s
+Waiting for deployment "api" rollout to finish: 1 out of 4 new replicas have been updated...
+Waiting for deployment "api" rollout to finish: 1 out of 4 new replicas have been updated...
+Waiting for deployment "api" rollout to finish: 1 out of 4 new replicas have been updated...
+Waiting for deployment "api" rollout to finish: 2 out of 4 new replicas have been updated...
+Waiting for deployment "api" rollout to finish: 2 out of 4 new replicas have been updated...
+Waiting for deployment "api" rollout to finish: 2 out of 4 new replicas have been updated...
+Waiting for deployment "api" rollout to finish: 2 out of 4 new replicas have been updated...
+Waiting for deployment "api" rollout to finish: 3 out of 4 new replicas have been updated...
+Waiting for deployment "api" rollout to finish: 3 out of 4 new replicas have been updated...
+Waiting for deployment "api" rollout to finish: 3 out of 4 new replicas have been updated...
+Waiting for deployment "api" rollout to finish: 3 out of 4 new replicas have been updated...
+Waiting for deployment "api" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "api" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "api" rollout to finish: 1 old replicas are pending termination...
+deployment "api" successfully rolled out
++ kubectl -n taskboard rollout history deploy/api
+deployment.apps/api 
+REVISION  CHANGE-CAUSE
+2         api 1.1.0
+3         api 1.0.0
+
++ kubectl -n taskboard get deploy api -o 'jsonpath={.spec.template.spec.containers[0].image}'
+ghcr.io/davlicha/taskboard-api:1.0.0+ echo
+
++ kubectl -n taskboard set image deploy/api api=ghcr.io/davlicha/taskboard-api:9.9.9-missing
+deployment.apps/api image updated
++ sleep 30
++ kubectl -n taskboard get pods -l app.kubernetes.io/name=api
+NAME                   READY   STATUS         RESTARTS   AGE
+api-758cd668cf-cm2gc   1/1     Running        0          43s
+api-758cd668cf-rj66c   1/1     Running        0          49s
+api-758cd668cf-vxz8z   1/1     Running        0          55s
+api-758cd668cf-z8bt5   1/1     Running        0          37s
+api-76ccf78468-2kktd   0/1     ErrImagePull   0          31s
+++ kubectl -n taskboard get pod -l app.kubernetes.io/name=api --field-selector=status.phase=Pending -o 'jsonpath={.items[0].metadata.name}'
++ BAD=api-76ccf78468-2kktd
++ kubectl -n taskboard describe pod api-76ccf78468-2kktd
++ sed -n '/Events:/,$p'
+Events:
+  Type     Reason     Age                From               Message
+  ----     ------     ----               ----               -------
+  Normal   Scheduled  31s                default-scheduler  Successfully assigned taskboard/api-76ccf78468-2kktd to minikube
+  Normal   Pulling    17s (x2 over 30s)  kubelet            spec.containers{api}: Pulling image "ghcr.io/davlicha/taskboard-api:9.9.9-missing"
+  Warning  Failed     16s (x2 over 30s)  kubelet            spec.containers{api}: Failed to pull image "ghcr.io/davlicha/taskboard-api:9.9.9-missing": failed to pull and unpack image "ghcr.io/davlicha/taskboard-api:9.9.9-missing": failed to resolve reference "ghcr.io/davlicha/taskboard-api:9.9.9-missing": failed to authorize: failed to fetch anonymous token: unexpected status from GET request to https://ghcr.io/token?scope=repository%3Adavlicha%2Ftaskboard-api%3Apull&service=ghcr.io: 403 Forbidden
+  Warning  Failed     16s (x2 over 30s)  kubelet            spec.containers{api}: Error: ErrImagePull
+  Normal   BackOff    3s (x2 over 30s)   kubelet            spec.containers{api}: Back-off pulling image "ghcr.io/davlicha/taskboard-api:9.9.9-missing"
+  Warning  Failed     3s (x2 over 30s)   kubelet            spec.containers{api}: Error: ImagePullBackOff
++ kubectl -n taskboard get events --field-selector involvedObject.name=api-76ccf78468-2kktd --sort-by=.lastTimestamp
++ tail -5
+17s         Normal    Pulling     pod/api-76ccf78468-2kktd   Pulling image "ghcr.io/davlicha/taskboard-api:9.9.9-missing"
+16s         Warning   Failed      pod/api-76ccf78468-2kktd   Failed to pull image "ghcr.io/davlicha/taskboard-api:9.9.9-missing": failed to pull and unpack image "ghcr.io/davlicha/taskboard-api:9.9.9-missing": failed to resolve reference "ghcr.io/davlicha/taskboard-api:9.9.9-missing": failed to authorize: failed to fetch anonymous token: unexpected status from GET request to https://ghcr.io/token?scope=repository%3Adavlicha%2Ftaskboard-api%3Apull&service=ghcr.io: 403 Forbidden
+16s         Warning   Failed      pod/api-76ccf78468-2kktd   Error: ErrImagePull
+3s          Normal    BackOff     pod/api-76ccf78468-2kktd   Back-off pulling image "ghcr.io/davlicha/taskboard-api:9.9.9-missing"
+3s          Warning   Failed      pod/api-76ccf78468-2kktd   Error: ImagePullBackOff
++ kubectl -n taskboard logs deploy/api --tail=3
+Found 5 pods, using pod/api-758cd668cf-vxz8z
+{"time": "2026-11-25T23:03:52.704+00:00", "level": "info", "logger": "taskboard", "msg": "request", "method": "GET", "route": "/health", "status": 200, "duration_ms": 1.44, "instance": "api-758cd668cf-vxz8z", "version": "1.0.0"}
+{"time": "2026-11-25T23:03:57.290+00:00", "level": "info", "logger": "taskboard", "msg": "request", "method": "GET", "route": "/livez", "status": 200, "duration_ms": 0.98, "instance": "api-758cd668cf-vxz8z", "version": "1.0.0"}
+{"time": "2026-11-25T23:03:57.705+00:00", "level": "info", "logger": "taskboard", "msg": "request", "method": "GET", "route": "/health", "status": 200, "duration_ms": 1.39, "instance": "api-758cd668cf-vxz8z", "version": "1.0.0"}
++ kubectl -n taskboard exec deploy/api -- sh -c 'hostname; id; ls /app'
+api-758cd668cf-vxz8z
+uid=10001(app) gid=10001(app) groups=10001(app)
+app
++ kubectl -n taskboard rollout undo deploy/api
+Warning: resource deployments/api was previously managed with 'kubectl apply'. Rolling back will not update the kubectl.kubernetes.io/last-applied-configuration annotation, which may cause unexpected behavior on future 'kubectl apply' operations. Consider using 'kubectl apply' with your previous configuration file instead.
+deployment.apps/api rolled back
++ kubectl -n taskboard rollout status deploy/api --timeout=180s
+deployment "api" successfully rolled out
++ kubectl -n taskboard scale deploy/api --replicas=2
+deployment.apps/api scaled
++ sleep 5
++ kubectl -n taskboard get pods
+NAME                        READY   STATUS    RESTARTS   AGE
+api-758cd668cf-cm2gc        1/1     Running   0          48s
+api-758cd668cf-vxz8z        1/1     Running   0          60s
+postgres-67b669f994-lgwcn   1/1     Running   0          2m48s
+web-8bd88ffd6-48qkt         1/1     Running   0          2m48s
+web-8bd88ffd6-rnjdc         1/1     Running   0          2m48s
+deployment "api" successfully rolled out
+availability during update (with preStop): ok=119 fail=1
+availability during update 1.1.0 -> 1.0.0 (with preStop, repeated): ok=140 fail=0

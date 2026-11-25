@@ -1,0 +1,29 @@
+# ЛР-5: застосунок під керуванням Argo CD з автоматичною синхронізацією
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: taskboard
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10" # після контролерів і моніторингу
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/davlicha/taskboard.git
+    targetRevision: main
+    path: charts/taskboard
+    helm:
+      releaseName: taskboard
+      valueFiles:
+        - values-minikube.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: taskboard
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true # ЛР-5 п.6a: спершу false (OutOfSync), потім true
+    syncOptions:
+      - CreateNamespace=true

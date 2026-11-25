@@ -1,0 +1,12 @@
+{{- if .Values.metrics.dashboard.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "taskboard.fullname" . }}-dashboard
+  labels:
+    {{- include "taskboard.labels" (dict "root" . "component" "dashboard") | nindent 4 }}
+    grafana_dashboard: "1"
+data:
+  taskboard.json: |-
+    {{- .Files.Get "dashboards/taskboard.json" | replace "__NAMESPACE__" .Release.Namespace | nindent 4 }}
+{{- end }}

@@ -1,0 +1,19 @@
+Taskboard {{ .Values.api.image.tag | default .Chart.AppVersion }} встановлено як реліз "{{ .Release.Name }}" у namespace "{{ .Release.Namespace }}".
+
+Як відкрити застосунок:
+{{- if .Values.ingress.enabled }}
+  1. minikube addons enable ingress && minikube tunnel
+  2. Додайте в /etc/hosts:  127.0.0.1 {{ .Values.ingress.host }}
+  3. Відкрийте http://{{ .Values.ingress.host }}/
+{{- else if eq .Values.web.service.type "NodePort" }}
+  minikube service {{ include "taskboard.componentName" (dict "root" . "component" "web") }} -n {{ .Release.Namespace }}
+{{- else }}
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "taskboard.componentName" (dict "root" . "component" "web") }} 8080:{{ .Values.web.service.port }}
+  -> http://localhost:8080
+{{- end }}
+
+API (версія / health):
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "taskboard.componentName" (dict "root" . "component" "api") }} 8000:{{ .Values.api.service.port }}
+  curl localhost:8000/health
+
+Перевірка релізу:  helm test {{ .Release.Name }} -n {{ .Release.Namespace }}

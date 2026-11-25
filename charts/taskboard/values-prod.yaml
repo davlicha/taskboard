@@ -1,0 +1,30 @@
+# "Продакшн"-подібне середовище
+api:
+  image:
+    tag: "1.0.0"
+  replicaCount: 3
+  resources:
+    requests: { cpu: 200m, memory: 192Mi }
+    limits: { cpu: "1", memory: 512Mi }
+  config:
+    APP_ENV: prod
+    LOG_LEVEL: WARNING
+web:
+  image:
+    tag: "1.0.0"
+  replicaCount: 2
+  service:
+    type: ClusterIP
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits: { cpu: 500m, memory: 256Mi }
+  config:
+    APP_TITLE: Taskboard
+ingress:
+  enabled: true
+  host: taskboard.local
+postgres:
+  # розмір PVC не змінюємо між середовищами: hostpath у minikube не підтримує resize
+  resources:
+    requests: { cpu: 250m, memory: 256Mi }
+    limits: { cpu: "1", memory: 1Gi }

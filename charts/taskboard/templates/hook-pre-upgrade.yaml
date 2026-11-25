@@ -1,0 +1,38 @@
+{{- /* ЛР-4, п.9b: pre-upgrade хук — перевіряє доступність БД перед оновленням */}}
+{{- if and .Values.hooks.preUpgrade.enabled .Values.postgres.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "taskboard.fullname" . }}-pre-upgrade
+  labels:
+    {{- include "taskboard.labels" (dict "root" . "component" "hook") | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 120
+  template:
+    metadata:
+      labels:
+        {{- include "taskboard.selectorLabels" (dict "root" . "component" "hook") | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: db-check
+          image: {{ .Values.postgres.image }}
+          envFrom:
+            - secretRef:
+                name: {{ include "taskboard.dbSecretName" . }}
+          command:
+            - sh
+            - -c
+            - |
+              echo "pre-upgrade: release {{ .Release.Name }} revision {{ .Release.Revision }} -> api {{ .Values.api.image.tag | default .Chart.AppVersion }}"
+              for i in $(seq 1 20); do
+                pg_isready -h {{ include "taskboard.dbHost" . }} -U "$POSTGRES_USER" -d "$POSTGRES_DB" && exit 0
+                sleep 3
+              done
+              echo "database is not ready, abort upgrade"; exit 1
+{{- end }}

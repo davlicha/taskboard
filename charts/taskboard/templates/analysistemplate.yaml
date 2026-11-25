@@ -1,0 +1,32 @@
+{{- /* ЛР-7: аналіз частки успішних запитів нової (canary) версії через Prometheus */}}
+{{- if and .Values.api.rollout.enabled .Values.analysis.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: {{ include "taskboard.fullname" . }}-success-rate
+  labels:
+    {{- include "taskboard.labels" (dict "root" . "component" "api") | nindent 4 }}
+spec:
+  args:
+    - name: canary-hash
+    - name: namespace
+      value: {{ .Release.Namespace }}
+    - name: service
+      value: {{ include "taskboard.componentName" (dict "root" . "component" "api") }}
+  metrics:
+    - name: success-rate
+      # перший вимір — коли новий под уже має ~1 хв даних (інакше rate() = NaN)
+      initialDelay: {{ .Values.analysis.initialDelay }}
+      interval: {{ .Values.analysis.interval }}
+      count: {{ .Values.analysis.count }}
+      failureLimit: {{ .Values.analysis.failureLimit }}
+      # NaN (немає трафіку) теж вважається невдачею — аналіз запускати під навантаженням
+      successCondition: "len(result) > 0 && !isNaN(result[0]) && result[0] >= {{ .Values.analysis.successRate }}"
+      provider:
+        prometheus:
+          address: {{ .Values.analysis.prometheusAddress }}
+          query: |
+            sum(rate(http_requests_total{namespace="{{ "{{" }}args.namespace{{ "}}" }}", service="{{ "{{" }}args.service{{ "}}" }}", rollouts_pod_template_hash="{{ "{{" }}args.canary-hash{{ "}}" }}", route=~"/api/.*", status!~"5.."}[1m]))
+            /
+            sum(rate(http_requests_total{namespace="{{ "{{" }}args.namespace{{ "}}" }}", service="{{ "{{" }}args.service{{ "}}" }}", rollouts_pod_template_hash="{{ "{{" }}args.canary-hash{{ "}}" }}", route=~"/api/.*"}[1m]))
+{{- end }}

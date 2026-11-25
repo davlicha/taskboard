@@ -1,0 +1,40 @@
+{{- /* ЛР-6: Argo Rollouts замість Deployment (api.rollout.enabled=true) */}}
+{{- if .Values.api.rollout.enabled }}
+{{- $fullname := include "taskboard.fullname" . }}
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: {{ include "taskboard.componentName" (dict "root" . "component" "api") }}
+  labels:
+    {{- include "taskboard.labels" (dict "root" . "component" "api") | nindent 4 }}
+spec:
+  replicas: {{ .Values.api.rollout.replicas }}
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      {{- include "taskboard.selectorLabels" (dict "root" . "component" "api") | nindent 6 }}
+  template:
+    {{- include "taskboard.api.podTemplate" . | nindent 4 }}
+  strategy:
+    canary:
+      {{- with .Values.api.rollout.canary.maxSurge }}
+      maxSurge: {{ . }}
+      {{- end }}
+      maxUnavailable: {{ .Values.api.rollout.canary.maxUnavailable }}
+      steps:
+        {{- range .Values.api.rollout.canary.steps }}
+        {{- if hasKey . "analysis" }}
+        {{- if $.Values.analysis.enabled }}
+        - analysis:
+            templates:
+              - templateName: {{ $fullname }}-success-rate
+            args:
+              - name: canary-hash
+                valueFrom:
+                  podTemplateHashValue: Latest
+        {{- end }}
+        {{- else }}
+        - {{ toYaml . | nindent 10 | trim }}
+        {{- end }}
+        {{- end }}
+{{- end }}

@@ -1,0 +1,42 @@
+--- GET /health
+{
+    "status": "ok"
+}
+--- POST /items
+{
+    "id": "45af71a3-b15b-4fac-b316-8a8ca1df4c09",
+    "title": "Lab 8",
+    "note": "serverless on LocalStack",
+    "created_at": "2026-11-25T22:56:22+00:00"
+}
+--- GET /items
+{
+    "items": [
+        {
+            "note": "serverless on LocalStack",
+            "created_at": "2026-11-25T22:56:22+00:00",
+            "id": "45af71a3-b15b-4fac-b316-8a8ca1df4c09",
+            "title": "Lab 8"
+        }
+    ],
+    "count": 1
+}
+--- GET /items/45af71a3-b15b-4fac-b316-8a8ca1df4c09
+{
+    "note": "serverless on LocalStack",
+    "created_at": "2026-11-25T22:56:22+00:00",
+    "id": "45af71a3-b15b-4fac-b316-8a8ca1df4c09",
+    "title": "Lab 8"
+}
+--- DELETE /items/45af71a3-b15b-4fac-b316-8a8ca1df4c09
+{
+    "deleted": "45af71a3-b15b-4fac-b316-8a8ca1df4c09"
+}
+--- GET /items/45af71a3-b15b-4fac-b316-8a8ca1df4c09 (404)
+{"error": "item not found"}
+HTTP 404
+--- POST /items без title (400)
+{"error": "field 'title' is required"}
+HTTP 400
+--- DynamoDB scan
+0

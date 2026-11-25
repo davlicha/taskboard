@@ -1,0 +1,52 @@
+### Lab 6/7 verification on minikube (helm install of the same chart versions as argocd-apps/)
+
+## Good release (template change, failRate=0): analysis Successful -> manual pause at 25%
+Failed value=[]
+Successful value=[1]
+Successful value=[1]
+Successful value=[1]
+
+## Bad release (--set api.failRate=0.3)
+Failed value=[0.7138949864575236]
+Failed value=[0.6986560303581236]
+NAME                           STATUS       AGE
+taskboard-api-59755fd55d-2-1   Successful   4m20s
+taskboard-api-66f984569f-3-1   Failed       70s
+
+Name:            taskboard-api
+Namespace:       taskboard
+Status:          ✖ Degraded
+Message:         RolloutAborted: Rollout aborted update to revision 3: Step-based analysis phase error/failed: Metric "success-rate" assessed Failed due to failed (2) > failureLimit (1)
+Strategy:        Canary
+  Step:          0/7
+  SetWeight:     0
+  ActualWeight:  0
+Images:          ghcr.io/davlicha/taskboard-api:1.0.0 (stable)
+Replicas:
+  Desired:       4
+  Current:       4
+  Updated:       0
+  Ready:         4
+  Available:     4
+
+NAME                                       KIND         STATUS         AGE    INFO
+⟳ taskboard-api                            Rollout      ✖ Degraded     10m    
+├──# revision:3                                                               
+│  ├──⧉ taskboard-api-66f984569f           ReplicaSet   • ScaledDown   77s    canary
+│  │  └──□ taskboard-api-66f984569f-6wmmn  Pod          ◌ Terminating  77s    ready:1/1
+│  └──α taskboard-api-66f984569f-3-1       AnalysisRun  ✖ Failed       71s    ✖ 2
+├──# revision:2                                                               
+│  ├──⧉ taskboard-api-59755fd55d           ReplicaSet   ✔ Healthy      4m27s  stable
+│  │  ├──□ taskboard-api-59755fd55d-r6qbj  Pod          ✔ Running      4m27s  ready:1/1
+│  │  ├──□ taskboard-api-59755fd55d-wwl8k  Pod          ✔ Running      2m35s  ready:1/1
+│  │  ├──□ taskboard-api-59755fd55d-kv7xs  Pod          ✔ Running      2m     ready:1/1
+│  │  └──□ taskboard-api-59755fd55d-t8v4h  Pod          ✔ Running      11s    ready:1/1
+│  └──α taskboard-api-59755fd55d-2-1       AnalysisRun  ✔ Successful   4m21s  ✔ 3,✖ 1
+└──# revision:1                                                               
+   └──⧉ taskboard-api-84b9f67fc7           ReplicaSet   • ScaledDown   10m    
+
+## 5xx by pod template hash (Prometheus)
+{'rollouts_pod_template_hash': '66f984569f'} 1.126
+
+## Alerts
+Healthy

@@ -1,0 +1,139 @@
+# Лабораторна №2: Continuous Integration
+#  - запуск на кожен PR і push у main (та на теги v*)
+#  - окремий job на кожен сервіс через matrix: Lint -> Build -> Test
+#  - збірка образів (needs: build-test), сканування Grype (блокуюче)
+#  - публікація в GHCR лише для push (не для PR)
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+    paths-ignore: ["**.md", "docs/**"]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/taskboard
+
+jobs:
+  build-test:
+    name: ${{ matrix.service }} · lint, build, test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false # падіння одного сервісу не скасовує інші
+      matrix:
+        service: [api, web]
+    defaults:
+      run:
+        working-directory: services/${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip # кеш залежностей pip
+          cache-dependency-path: services/${{ matrix.service }}/requirements*.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint (ruff)
+        run: |
+          ruff check --output-format=github .
+          ruff format --check .
+
+      - name: Build
+        run: python -m compileall -q app
+
+      - name: Test
+        run: pytest -v --junitxml=test-results.xml
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.service }}
+          path: services/${{ matrix.service }}/test-results.xml
+
+  image:
+    name: ${{ matrix.service }} · docker image
+    needs: build-test # лише після успіху всіх build/test jobs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [api, web]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Image metadata (tags)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_PREFIX }}-${{ matrix.service }}
+          tags: |
+            type=sha,format=short,prefix=sha-
+            type=raw,value=run-${{ github.run_number }}
+            type=semver,pattern={{version}}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: App version
+        id: ver
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT";
+          else echo "version=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Build image (local, no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: services/${{ matrix.service }}
+          load: true
+          push: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: APP_VERSION=${{ steps.ver.outputs.version }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+      - name: Scan image with Grype (blocking)
+        uses: anchore/scan-action@v6
+        with:
+          image: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
+          fail-build: true # знайдено CRITICAL з виправленням -> job падає
+          severity-cutoff: critical
+          only-fixed: true
+          output-format: table
+
+      - name: Login to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }} # секрет CI, не зберігається в репозиторії
+
+      - name: Push image
+        if: github.event_name == 'push'
+        uses: docker/build-push-action@v6
+        with:
+          context: services/${{ matrix.service }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: APP_VERSION=${{ steps.ver.outputs.version }}
+          cache-from: type=gha,scope=${{ matrix.service }}

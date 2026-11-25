@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "taskboard.componentName" (dict "root" . "component" "web") }}
+  labels:
+    {{- include "taskboard.labels" (dict "root" . "component" "web") | nindent 4 }}
+data:
+  API_URL: {{ printf "http://%s:%v" (include "taskboard.componentName" (dict "root" . "component" "api")) .Values.api.service.port | quote }}
+  {{- range $k, $v := .Values.web.config }}
+  {{ $k }}: {{ $v | quote }}
+  {{- end }}

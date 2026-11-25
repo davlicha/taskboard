@@ -1,0 +1,21 @@
+---------------------------------------------------------
+|                    DescribeAlarms                     |
++-------------------------+-----+--------------+--------+
+|  items-api-high-errors  |  OK |  ErrorCount  |  10.0  |
+|  items-api-high-latency |  OK |  Latency     |  300.0 |
++-------------------------+-----+--------------+--------+
+== 1. Нормальне навантаження
+[normal] sent=1692 5xx=0 duration=90s target_rps=20.0
+items-api-high-errors	OK items-api-high-latency	OK 
+== 2. Підвищене навантаження
+[normal] sent=3099 5xx=0 duration=60s target_rps=60.0
+items-api-high-errors	OK items-api-high-latency	OK 
+== 3. Помилки (40% запитів 5xx)
+[errors] sent=1691 5xx=672 duration=90s target_rps=20.0
+items-api-high-errors	ALARM items-api-high-latency	OK 
+== 4. Затримки (50% запитів +600мс)
+[slow] sent=531 5xx=0 duration=90s target_rps=6.0
+items-api-high-errors	OK items-api-high-latency	ALARM 
+== 5. Відновлення
+[normal] sent=1691 5xx=0 duration=90s target_rps=20.0
+items-api-high-errors	OK items-api-high-latency	OK 

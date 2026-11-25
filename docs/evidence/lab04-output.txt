@@ -1,0 +1,259 @@
++ C=charts/taskboard
++ kubectl delete -f k8s/ --wait=true --ignore-not-found
++ helm version --short
+v4.3.2+g8346aaa
++ grep -E '^[<>].*(replicas|image:|cpu|memory|APP_ENV|LOG_LEVEL|kind: Ingress|type:)'
+++ helm template taskboard charts/taskboard -f charts/taskboard/values-dev.yaml
++ diff /dev/fd/63 /dev/fd/62
++ head -40
+++ helm template taskboard charts/taskboard -f charts/taskboard/values-prod.yaml
+<   APP_ENV: "dev"
+>   APP_ENV: "prod"
+<   LOG_LEVEL: "DEBUG"
+>   LOG_LEVEL: "WARNING"
+<   type: NodePort
+>   type: ClusterIP
+<   replicas: 1
+>   replicas: 3
+<           image: ghcr.io/davlicha/taskboard-api:1.1.0
+>           image: ghcr.io/davlicha/taskboard-api:1.0.0
+<               cpu: 300m
+<               memory: 192Mi
+>               cpu: "1"
+>               memory: 512Mi
+<               cpu: 50m
+<               memory: 96Mi
+>               cpu: 200m
+>               memory: 192Mi
+<               cpu: 500m
+<               memory: 512Mi
+>               cpu: "1"
+>               memory: 1Gi
+<               cpu: 100m
+<               memory: 128Mi
+>               cpu: 250m
+>               memory: 256Mi
+<   replicas: 1
+>   replicas: 2
+<           image: ghcr.io/davlicha/taskboard-web:1.1.0
+>           image: ghcr.io/davlicha/taskboard-web:1.0.0
+<               cpu: 300m
+<               memory: 192Mi
+>               cpu: 500m
+>               memory: 256Mi
+<               cpu: 50m
+<               memory: 64Mi
+>               cpu: 100m
+>               memory: 128Mi
+> kind: Ingress
++ helm lint charts/taskboard -f charts/taskboard/values-dev.yaml -f charts/taskboard/values-prod.yaml
+==> Linting charts/taskboard
+[INFO] Chart.yaml: icon is recommended
+
+1 chart(s) linted, 0 chart(s) failed
++ helm install taskboard charts/taskboard -n taskboard-lab4 --create-namespace --wait --timeout 5m
+NAME: taskboard
+LAST DEPLOYED: Thu Nov 26 01:08:41 2026
+NAMESPACE: taskboard-lab4
+STATUS: deployed
+REVISION: 1
+DESCRIPTION: Install complete
+NOTES:
+Taskboard 1.0.0 встановлено як реліз "taskboard" у namespace "taskboard-lab4".
+
+Як відкрити застосунок:
+  minikube service taskboard-web -n taskboard-lab4
+
+API (версія / health):
+  kubectl -n taskboard-lab4 port-forward svc/taskboard-api 8000:8000
+  curl localhost:8000/health
+
+Перевірка релізу:  helm test taskboard -n taskboard-lab4
++ helm list -n taskboard-lab4
+NAME     	NAMESPACE     	REVISION	UPDATED                            	STATUS  	CHART          	APP VERSION
+taskboard	taskboard-lab4	1       	2026-11-26 01:08:41.31051 +0200 EET	deployed	taskboard-0.4.0	1.0.0      
++ helm status taskboard -n taskboard-lab4
++ head -12
+NAME: taskboard
+LAST DEPLOYED: Thu Nov 26 01:08:41 2026
+NAMESPACE: taskboard-lab4
+STATUS: deployed
+REVISION: 1
+DESCRIPTION: Install complete
+RESOURCES:
+==> v1/Secret
+NAME           TYPE     DATA   AGE
+taskboard-db   Opaque   3      11s
+
+==> v1/ConfigMap
++ helm get values taskboard -n taskboard-lab4 --all
++ head -20
+COMPUTED VALUES:
+analysis:
+  count: 4
+  enabled: false
+  failureLimit: 1
+  interval: 30s
+  prometheusAddress: http://kube-prometheus-stack-prometheus.monitoring.svc:9090
+  successRate: 0.95
+api:
+  config:
+    APP_ENV: dev
+    APP_NAME: taskboard-api
+    LOG_LEVEL: DEBUG
+  failRate: "0"
+  image:
+    pullPolicy: IfNotPresent
+    repository: ghcr.io/davlicha/taskboard-api
+    tag: ""
+  replicaCount: 1
+  resources:
++ kubectl -n taskboard-lab4 get all
+NAME                                      READY   STATUS    RESTARTS   AGE
+pod/taskboard-api-57b648d69-5csc2         1/1     Running   0          12s
+pod/taskboard-postgres-6694b44655-9vl4v   1/1     Running   0          12s
+pod/taskboard-web-758fdd5446-t5rpj        1/1     Running   0          12s
+
+NAME                         TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)        AGE
+service/taskboard-api        ClusterIP   10.102.155.84    <none>        8000/TCP       12s
+service/taskboard-postgres   ClusterIP   10.100.207.194   <none>        5432/TCP       12s
+service/taskboard-web        NodePort    10.106.8.127     <none>        80:32106/TCP   12s
+
+NAME                                 READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/taskboard-api        1/1     1            1           12s
+deployment.apps/taskboard-postgres   1/1     1            1           12s
+deployment.apps/taskboard-web        1/1     1            1           12s
+
+NAME                                            DESIRED   CURRENT   READY   AGE
+replicaset.apps/taskboard-api-57b648d69         1         1         1       12s
+replicaset.apps/taskboard-postgres-6694b44655   1         1         1       12s
+replicaset.apps/taskboard-web-758fdd5446        1         1         1       12s
++ kubectl -n taskboard-lab4 get secrets -l owner=helm --show-labels
+NAME                              TYPE                 DATA   AGE   LABELS
+sh.helm.release.v1.taskboard.v1   helm.sh/release.v1   1      12s   modifiedAt=1795648132,name=taskboard,owner=helm,status=deployed,version=1
++ helm upgrade taskboard charts/taskboard -n taskboard-lab4 --reuse-values --set api.image.tag=1.1.0 --wait --timeout 5m
+Release "taskboard" has been upgraded. Happy Helming!
+NAME: taskboard
+LAST DEPLOYED: Thu Nov 26 01:08:53 2026
+NAMESPACE: taskboard-lab4
+STATUS: deployed
+REVISION: 2
+DESCRIPTION: Upgrade complete
+NOTES:
+Taskboard 1.1.0 встановлено як реліз "taskboard" у namespace "taskboard-lab4".
+
+Як відкрити застосунок:
+  minikube service taskboard-web -n taskboard-lab4
+
+API (версія / health):
+  kubectl -n taskboard-lab4 port-forward svc/taskboard-api 8000:8000
+  curl localhost:8000/health
+
+Перевірка релізу:  helm test taskboard -n taskboard-lab4
++ kubectl -n taskboard-lab4 get pods
+NAME                                  READY   STATUS        RESTARTS   AGE
+taskboard-api-57b648d69-5csc2         1/1     Terminating   0          21s
+taskboard-api-58ccc476c5-22qdc        1/1     Running       0          6s
+taskboard-postgres-6694b44655-9vl4v   1/1     Running       0          21s
+taskboard-web-758fdd5446-t5rpj        1/1     Running       0          21s
++ helm upgrade taskboard charts/taskboard -n taskboard-lab4 -f charts/taskboard/values-prod.yaml --wait --timeout 5m
+Release "taskboard" has been upgraded. Happy Helming!
+NAME: taskboard
+LAST DEPLOYED: Thu Nov 26 01:09:03 2026
+NAMESPACE: taskboard-lab4
+STATUS: deployed
+REVISION: 3
+DESCRIPTION: Upgrade complete
+NOTES:
+Taskboard 1.0.0 встановлено як реліз "taskboard" у namespace "taskboard-lab4".
+
+Як відкрити застосунок:
+  1. minikube addons enable ingress && minikube tunnel
+  2. Додайте в /etc/hosts:  127.0.0.1 taskboard.local
+  3. Відкрийте http://taskboard.local/
+
+API (версія / health):
+  kubectl -n taskboard-lab4 port-forward svc/taskboard-api 8000:8000
+  curl localhost:8000/health
+
+Перевірка релізу:  helm test taskboard -n taskboard-lab4
++ kubectl -n taskboard-lab4 get deploy,ingress
+NAME                                 READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/taskboard-api        3/3     3            3           49s
+deployment.apps/taskboard-postgres   1/1     1            1           49s
+deployment.apps/taskboard-web        2/2     2            2           49s
+
+NAME                                  CLASS   HOSTS             ADDRESS        PORTS   AGE
+ingress.networking.k8s.io/taskboard   nginx   taskboard.local   192.168.49.2   80      24s
++ helm history taskboard -n taskboard-lab4
+REVISION	UPDATED                 	STATUS    	CHART          	APP VERSION	DESCRIPTION     
+1       	Thu Nov 26 01:08:41 2026	superseded	taskboard-0.4.0	1.0.0      	Install complete
+2       	Thu Nov 26 01:08:53 2026	superseded	taskboard-0.4.0	1.0.0      	Upgrade complete
+3       	Thu Nov 26 01:09:03 2026	deployed  	taskboard-0.4.0	1.0.0      	Upgrade complete
++ helm test taskboard -n taskboard-lab4 --logs
+NAME: taskboard
+LAST DEPLOYED: Thu Nov 26 01:09:03 2026
+NAMESPACE: taskboard-lab4
+STATUS: deployed
+REVISION: 3
+DESCRIPTION: Upgrade complete
+TEST SUITE:     taskboard-test
+Last Started:   Thu Nov 26 01:09:30 2026
+Last Completed: Thu Nov 26 01:09:31 2026
+Phase:          Succeeded
+
+POD LOGS: taskboard-test (curl)
+{"status":"ok","db":"ok","version":"1.0.0","env":"prod","instance":"taskboard-api-5765b796c-kqlm4"}
+web: 200
+
++ helm rollback taskboard 2 -n taskboard-lab4 --wait --timeout 5m
+Rollback was a success! Happy Helming!
++ helm history taskboard -n taskboard-lab4
+REVISION	UPDATED                 	STATUS    	CHART          	APP VERSION	DESCRIPTION     
+1       	Thu Nov 26 01:08:41 2026	superseded	taskboard-0.4.0	1.0.0      	Install complete
+2       	Thu Nov 26 01:08:53 2026	superseded	taskboard-0.4.0	1.0.0      	Upgrade complete
+3       	Thu Nov 26 01:09:03 2026	superseded	taskboard-0.4.0	1.0.0      	Upgrade complete
+4       	Thu Nov 26 01:09:32 2026	deployed  	taskboard-0.4.0	1.0.0      	Rollback to 2   
++ kubectl -n taskboard-lab4 get deploy -o 'custom-columns=NAME:.metadata.name,REPLICAS:.spec.replicas,IMAGE:.spec.template.spec.containers[0].image'
+NAME                 REPLICAS   IMAGE
+taskboard-api        1          ghcr.io/davlicha/taskboard-api:1.1.0
+taskboard-postgres   1          postgres:16-alpine
+taskboard-web        1          ghcr.io/davlicha/taskboard-web:1.0.0
++ helm install second charts/taskboard -n taskboard-lab4 --set postgres.persistence.enabled=false --wait --timeout 5m
+NAME: second
+LAST DEPLOYED: Thu Nov 26 01:09:43 2026
+NAMESPACE: taskboard-lab4
+STATUS: deployed
+REVISION: 1
+DESCRIPTION: Install complete
+NOTES:
+Taskboard 1.0.0 встановлено як реліз "second" у namespace "taskboard-lab4".
+
+Як відкрити застосунок:
+  minikube service second-taskboard-web -n taskboard-lab4
+
+API (версія / health):
+  kubectl -n taskboard-lab4 port-forward svc/second-taskboard-api 8000:8000
+  curl localhost:8000/health
+
+Перевірка релізу:  helm test second -n taskboard-lab4
++ kubectl -n taskboard-lab4 get deploy
+NAME                        READY   UP-TO-DATE   AVAILABLE   AGE
+second-taskboard-api        1/1     1            1           11s
+second-taskboard-postgres   1/1     1            1           11s
+second-taskboard-web        1/1     1            1           11s
+taskboard-api               1/1     1            1           73s
+taskboard-postgres          1/1     1            1           73s
+taskboard-web               1/1     1            1           73s
++ helm uninstall second -n taskboard-lab4
+release "second" uninstalled
++ helm uninstall taskboard -n taskboard-lab4 --wait
+release "taskboard" uninstalled
++ sleep 5
++ kubectl -n taskboard-lab4 get all,pvc,secret,configmap,ingress
+NAME                                 READY   STATUS        RESTARTS   AGE
+pod/taskboard-api-5765b796c-m8f7f    1/1     Terminating   0          54s
+pod/taskboard-api-58ccc476c5-22qdc   0/1     Error         0          64s
+
+NAME                         DATA   AGE
+configmap/kube-root-ca.crt   1      79s

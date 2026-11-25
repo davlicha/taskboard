@@ -1,0 +1,42 @@
+# Генератор навантаження всередині кластера (ЛР-6, ЛР-7). Не керується Argo CD.
+#   kubectl apply -f tools/loadgen.yaml        kubectl -n taskboard logs -f deploy/loadgen
+#   kubectl -n taskboard scale deploy/loadgen --replicas=0   # зупинити
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loadgen
+  namespace: taskboard
+  labels: { app: loadgen }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: loadgen }
+  template:
+    metadata:
+      labels: { app: loadgen }
+    spec:
+      containers:
+        - name: loadgen
+          image: curlimages/curl:8.11.1
+          env:
+            - name: TARGET
+              value: http://taskboard-api:8000
+            - name: RPS
+              value: "10"
+          command:
+            - sh
+            - -c
+            - |
+              i=0
+              while true; do
+                i=$((i+1))
+                # GET зі списком і читання версії -> видно, яка версія відповідає
+                code=$(curl -s -o /dev/null -w '%{http_code}' "$TARGET/api/tasks")
+                ver=$(curl -s "$TARGET/version" | sed 's/.*"version":"\([^"]*\)".*/\1/')
+                [ $((i % 20)) -eq 0 ] && curl -s -o /dev/null -X POST "$TARGET/api/tasks" -H 'content-type: application/json' -d "{\"title\":\"load $i\"}"
+                echo "$(date +%T) /api/tasks=$code version=$ver"
+                sleep $(awk "BEGIN{print 1/$RPS}")
+              done
+          resources:
+            requests: { cpu: 20m, memory: 16Mi }
+            limits: { cpu: 200m, memory: 64Mi }

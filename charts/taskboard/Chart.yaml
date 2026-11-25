@@ -1,0 +1,11 @@
+apiVersion: v2
+name: taskboard
+description: Taskboard — веб-інтерфейс (Flask), API (FastAPI) та PostgreSQL
+type: application
+# version — версія самого чарта (шаблонів). Збільшується при зміні чарта.
+version: 0.4.0
+# appVersion — версія застосунку (тег образу за замовчуванням).
+appVersion: "1.0.0"
+keywords: [devops, lab, fastapi, flask, postgres]
+maintainers:
+  - name: davlicha

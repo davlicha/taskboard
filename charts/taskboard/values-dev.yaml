@@ -1,0 +1,19 @@
+# Середовище розробки
+api:
+  image:
+    tag: "1.1.0"
+  replicaCount: 1
+  resources:
+    requests: { cpu: 50m, memory: 96Mi }
+    limits: { cpu: 300m, memory: 192Mi }
+  config:
+    APP_ENV: dev
+    LOG_LEVEL: DEBUG
+web:
+  image:
+    tag: "1.1.0"
+  replicaCount: 1
+  config:
+    APP_TITLE: Taskboard (dev)
+ingress:
+  enabled: false

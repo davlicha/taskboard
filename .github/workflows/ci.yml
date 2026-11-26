@@ -86,6 +86,8 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.IMAGE_PREFIX }}-${{ matrix.service }}
+          # без цього type=semver автоматично додає latest і для git-тегів
+          flavor: latest=false
           tags: |
             type=sha,format=short,prefix=sha-
             type=raw,value=run-${{ github.run_number }}

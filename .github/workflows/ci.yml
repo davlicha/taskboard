@@ -79,6 +79,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # QEMU — щоб зібрати linux/arm64 (Apple Silicon / minikube на Mac M-серії)
+      - uses: docker/setup-qemu-action@v3
+
       - uses: docker/setup-buildx-action@v3
 
       - name: Image metadata (tags)
@@ -129,13 +132,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }} # секрет CI, не зберігається в репозиторії
 
-      - name: Push image
+      - name: Push image (multi-arch)
         if: github.event_name == 'push'
         uses: docker/build-push-action@v6
         with:
           context: services/${{ matrix.service }}
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: APP_VERSION=${{ steps.ver.outputs.version }}
-          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-from: type=gha,scope=${{ matrix.service }}-multiarch
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}-multiarch

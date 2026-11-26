@@ -36,6 +36,7 @@ Job `image` має `needs: build-test` — запускається лише п�
 
 - `docker/login-action` з `secrets.GITHUB_TOKEN` (облікові дані не зберігаються в репозиторії; `permissions: packages: write`);
 - крок `Push image` має `if: github.event_name == 'push'` — для PR образи не публікуються;
+- публікується **мультиархітектурний** образ `linux/amd64` + `linux/arm64` (QEMU + buildx), щоб він запускався і на Mac з Apple Silicon / minikube arm64;
 - теги (`docker/metadata-action`):
   - `sha-<7 символів>` і `run-<номер>` — унікальні теги збірки;
   - `latest` — лише для `main`;
